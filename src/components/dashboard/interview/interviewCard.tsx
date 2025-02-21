@@ -73,28 +73,50 @@ function InterviewCard({ name, interviewerId, id, url, readableSlug }: Props) {
   }, []);
 
   const copyToClipboard = () => {
-    navigator.clipboard
-      .writeText(
-        readableSlug ? `${base_url}/call/${readableSlug}` : (url as string),
-      )
-      .then(
-        () => {
+    const textToCopy = readableSlug ? `${base_url}/call/${readableSlug}` : (url as string);
+
+    if (navigator.clipboard && window.isSecureContext) {
+      // Use Clipboard API if available and in secure context
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
           setCopied(true);
-          toast.success(
-            "The link to your interview has been copied to your clipboard.",
-            {
-              position: "bottom-right",
-              duration: 3000,
-            },
-          );
+          toast.success("The link to your interview has been copied to your clipboard.", {
+            position: "bottom-right",
+            duration: 3000,
+          });
           setTimeout(() => {
             setCopied(false);
           }, 2000);
-        },
-        (err) => {
-          console.log("failed to copy", err.mesage);
-        },
-      );
+        })
+        .catch((err) => {
+          console.log("failed to copy", err.message);
+        });
+    } else {
+      // Fallback for browsers that don't support Clipboard API
+      const textarea = document.createElement("textarea");
+      textarea.value = textToCopy;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-999999px";
+      textarea.style.top = "-999999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        document.execCommand("copy");
+        textarea.remove();
+        setCopied(true);
+        toast.success("The link to your interview has been copied to your clipboard.", {
+          position: "bottom-right",
+          duration: 3000,
+        });
+        setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      } catch (err) {
+        console.log("failed to copy", err);
+        textarea.remove();
+      }
+    }
   };
 
   return (
