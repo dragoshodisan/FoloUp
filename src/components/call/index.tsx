@@ -195,52 +195,60 @@ function Call({ interview }: InterviewProps) {
   };
 
   const startConversation = async () => {
-    const data = {
-      mins: interview?.time_duration,
-      objective: interview?.objective,
-      questions: interview?.questions.map((q) => q.question).join(", "),
-      name: name || "not provided",
-    };
-    setLoading(true);
+    try {
+      const data = {
+        mins: interview?.time_duration,
+        objective: interview?.objective,
+        questions: interview?.questions.map((q) => q.question).join(", "),
+        name: name || "not provided",
+      };
+      setLoading(true);
 
-    const oldUserEmails: string[] = (
-      await ResponseService.getAllEmails(interview.id)
-    ).map((item) => item.email);
-    const OldUser =
-      oldUserEmails.includes(email) ||
-      (interview?.respondents && !interview?.respondents.includes(email));
+      const oldUserEmails: string[] = (
+        await ResponseService.getAllEmails(interview.id)
+      ).map((item) => item.email);
+      const OldUser =
+        oldUserEmails.includes(email) ||
+        (interview?.respondents && !interview?.respondents.includes(email));
 
-    if (OldUser) {
-      setIsOldUser(true);
-    } else {
-      const registerCallResponse: registerCallResponseType = await axios.post(
-        "/api/register-call",
-        { dynamic_data: data, interviewer_id: interview?.interviewer_id },
-      );
-      if (registerCallResponse.data.registerCallResponse.access_token) {
-        await webClient
-          .startCall({
-            accessToken:
-              registerCallResponse.data.registerCallResponse.access_token,
-          })
-          .catch(console.error);
-        setIsCalling(true);
-        setIsStarted(true);
-
-        setCallId(registerCallResponse?.data?.registerCallResponse?.call_id);
-
-        const response = await createResponse({
-          interview_id: interview.id,
-          call_id: registerCallResponse.data.registerCallResponse.call_id,
-          email: email,
-          name: name,
-        });
+      if (OldUser) {
+        setIsOldUser(true);
       } else {
-        console.log("Failed to register call");
-      }
-    }
+        const registerCallResponse: registerCallResponseType = await axios.post(
+          "/api/register-call",
+          { dynamic_data: data, interviewer_id: interview?.interviewer_id },
+        );
 
-    setLoading(false);
+        const accessToken = registerCallResponse.data.registerCallResponse.access_token;
+        const callId = registerCallResponse.data.registerCallResponse.call_id;
+
+        if (!accessToken) {
+          throw new Error("No access token received from registration");
+        }
+
+        try {
+          await webClient.startCall({ accessToken });
+          setIsCalling(true);
+          setIsStarted(true);
+          setCallId(callId);
+
+          await createResponse({
+            interview_id: interview.id,
+            call_id: callId,
+            email: email,
+            name: name,
+          });
+        } catch (callError) {
+          console.error("Failed to start call:", callError);
+          toast.error("Failed to start the interview. Please try again.");
+        }
+      }
+    } catch (error) {
+      console.error("Error in startConversation:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
