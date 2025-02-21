@@ -194,6 +194,22 @@ function Call({ interview }: InterviewProps) {
     }
   };
 
+  const checkMediaPermissions = async (): Promise<boolean> => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast.error("Your browser doesn't support audio input. Please try a different browser.");
+        return false;
+      }
+
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      return true;
+    } catch (error) {
+      console.error("Media permissions error:", error);
+      toast.error("Please allow microphone access to start the interview");
+      return false;
+    }
+  };
+
   const startConversation = async () => {
     try {
       const data = {
@@ -203,6 +219,13 @@ function Call({ interview }: InterviewProps) {
         name: name || "not provided",
       };
       setLoading(true);
+
+      // Check media permissions first
+      const hasMediaPermissions = await checkMediaPermissions();
+      if (!hasMediaPermissions) {
+        setLoading(false);
+        return;
+      }
 
       const oldUserEmails: string[] = (
         await ResponseService.getAllEmails(interview.id)
